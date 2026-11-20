@@ -1,14 +1,23 @@
 ---
 title: "A Model for the Distribution of SAT Total Scores"
-# Anonymized for double-blind review: the author block, affiliations,
-# and acknowledgements have been removed from this file.
-# Identifying information is in title_page.qmd and cover_letter.qmd,
-# which are submitted separately and not seen by reviewers.
+author:
+  - name: David Kane
+    affiliation: Techne, New College of Florida
 # The abstract is rendered as the first body section below (rather
 # than via YAML `abstract:`) so its headline numbers can be inline-R
 # expressions tied to the same posteriors as the rest of the paper.
 keywords: [SAT, score distributions, grouped data, sinh-arcsinh distribution, hierarchical Bayesian model, tail estimation]
 bibliography: references.bib
+# The SFFA decision is a CSL legal_case, which BibTeX cannot express,
+# so it is defined here instead of in references.bib.
+references:
+  - id: sffa2023
+    type: legal_case
+    title: "Students for Fair Admissions, Inc. <span class=\"nocase\">v.</span> President and Fellows of Harvard College"
+    container-title: "U.S."
+    volume: 600
+    page: 181
+    issued: 2023
 csl: apa.csl
 google-scholar: true
 link-citations: true
@@ -785,9 +794,9 @@ location is then
 $\mu_{r,y} = \theta_{r,y} - \sigma_{r,y}\,m(\epsilon_r, \delta_r)$,
 where $m(\epsilon, \delta) = \mathbb{E}[X]$ is computed by 24-node
 Gauss–Hermite quadrature once per group per draw. The prior is
-centred near the overall SAT mean and is wide enough to be
+centered near the overall SAT mean and is wide enough to be
 essentially flat over plausible group means. The fitted medians run
-from about 872 to 1250, all within 0.7 prior SDs of the centre. It matters only for the smallest groups. The No Response group's
+from about 872 to 1250, all within 0.7 prior SDs of the center. It matters only for the smallest groups. The No Response group's
 free log scale in each year has prior
 $\log\sigma_{\text{NR},y} \sim \mathcal{N}(\log 230, 0.4)$,
 independent across years. The group-level hierarchy uses the
