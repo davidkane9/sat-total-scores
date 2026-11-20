@@ -1,12 +1,13 @@
-# Shared data-loading for the submission qmds.  Sourced by
+# Shared data-loading for the manuscript.  Sourced by
 # documents/_headlines.R and by the setup chunk of
 # documents/sat_model.qmd; must be run from documents/ (which is the
-# qmds' working directory at render time).
+# qmd's working directory at render time).
 #
-# Reads:
+# Reads two things:
+#
 #   * The MI posterior — 50 per-imputation .rds files plus meta.rds
 #     under ../replicated/sims/mi/.
-#   * The eight per-year augmented race CSVs under
+#   * The nine per-year augmented race CSVs under
 #     ../replicated/data/race/augmented/, which carry the test-taker
 #     counts, printed group means, printed band percentages, cohort
 #     band counts, and derived No Response band percentages that the
@@ -21,7 +22,7 @@
 #               per_param_diag, plus RACES, YEARS, N_arr
 #   .n_div_mi   total divergences across the M imputations
 #   .RACES      character(8), the order Stan used
-#   .YEARS      integer(8), 2018:2025
+#   .YEARS      integer, the fitted years (2018:2026)
 #   .N_arr      8 × 8 numeric, test_takers[r, y]
 #   .mu_arr     8 × 8 numeric, printed mean_total[r, y]
 #   .p_obs      8 × 8 × 6 numeric, raw band proportions

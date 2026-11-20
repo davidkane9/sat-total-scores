@@ -4,9 +4,11 @@
 #
 # Scope is one of:
 #   data    parse the source PDFs under downloads/   → replicated/data/   (~2 min)
-#   sims    refit the Stan model from replicated/data/ → replicated/sims/  (~50 min on 8 cores)
+#   sims    refit the Stan models from replicated/data/ → replicated/sims/ (~1 hour on 8 cores):
+#           the canonical 50-imputation fit (sims/mi/), then the three
+#           sensitivity variants (sims/sensitivity/)
 #   docs    render documents/sat_model.qmd            → replicated/docs/  (~5 min)
-#   all     data → sims → docs in that order         (~1 hour, dominated by sims)
+#   all     data → sims → docs in that order         (~70 min, dominated by sims)
 #
 # Each stage reads from the prior stage's replicated/ output (or from
 # downloads/, for the parse step). If a needed input is missing,
@@ -59,13 +61,21 @@ gen_data() {
 gen_sims() {
     echo "=== generate sims ==="
     require_input data replicated/data/race/augmented
+    # Canonical fit first: 50 imputations → replicated/sims/mi/.
+    # Resumable — imputations already on disk are skipped.
     (cd code && Rscript run_fit_mi.R)
+    # Then the three sensitivity variants (skew-t, wide tail-weight
+    # prior, year-varying skewness), each fit once on imputation 1
+    # → replicated/sims/sensitivity/.  Its closing comparison reads
+    # sims/mi/imp_01.rds, so it must run after the canonical fit.
+    (cd code && Rscript run_fit_sensitivity.R)
 }
 
 gen_docs() {
     echo "=== generate docs ==="
     require_input data replicated/data/race/augmented
     require_input sims replicated/sims/mi
+    require_input sims replicated/sims/sensitivity
     # Render every .qmd present in documents/. sat_model.qmd is the
     # tracked replication target and always present; the four
     # ancillary qmds (abstract, cover_letter, lede, title_page) are

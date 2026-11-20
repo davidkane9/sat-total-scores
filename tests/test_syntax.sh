@@ -6,7 +6,7 @@
 # Covers:
 #   bash       bin/*, tests/*.sh                        (bash -n)
 #   python     code/*.py                                (ast.parse)
-#   R          code/run_fit_mi.R, documents/_*.R        (parse(file=))
+#   R          code/run_fit_*.R, documents/_*.R         (parse(file=))
 #   JSON       .devcontainer/devcontainer.json          (json.loads after
 #                                                        stripping JSONC
 #                                                        line comments)
@@ -42,7 +42,7 @@ for f in code/*.py; do
 done
 
 # ----- R source -----
-for f in code/run_fit_mi.R documents/_inputs.R documents/_headlines.R; do
+for f in code/run_fit_mi.R code/run_fit_sensitivity.R documents/_inputs.R documents/_headlines.R; do
     [[ -f "$f" ]] || continue
     if command -v Rscript >/dev/null 2>&1; then
         if Rscript -e "invisible(parse(file = '$f'))" >/dev/null 2>&1; then

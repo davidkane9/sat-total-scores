@@ -185,6 +185,15 @@ else
     warn "$SUBMITTED_DRAWS_DIR/ missing — bin/compare sims will report no-mirror until the canonical fit is frozen there"
 fi
 
+SENS_DIR="replicated/sims/sensitivity"
+n_sens=$(ls "$SENS_DIR"/skewt.rds "$SENS_DIR"/widedelta.rds "$SENS_DIR"/epsyear.rds \
+            "$SENS_DIR"/meta.rds 2>/dev/null | wc -l | tr -d ' ')
+if [[ "$n_sens" -eq 4 ]]; then
+    pass "$SENS_DIR/ has the 3 variant fits + meta.rds"
+else
+    warn "$SENS_DIR/ has $n_sens/4 files — run bin/generate sims (or bin/restore sims)"
+fi
+
 # ─── reproducibility env vars ──────────────────────────────────────────
 echo
 echo "=== reproducibility env ==="

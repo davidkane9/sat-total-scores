@@ -7,9 +7,9 @@
 #
 # Scope is one of:
 #   data    test that the Python parsers produce the canonical CSVs    (~2 min)
-#   sims    test that the Stan refit reproduces the canonical draws    (~50 min on 8 cores)
+#   sims    test that the Stan refits reproduce the canonical draws    (~1 hour on 8 cores)
 #   docs    test that quarto render reproduces the canonical .docx/.pdf/.html
-#   all     test the entire chain end-to-end                           (~1 hour on 8 cores)
+#   all     test the entire chain end-to-end                           (~70 min on 8 cores)
 #
 # Exits with the exit code of the final compare step: 0 if every file
 # in the cleaned/regenerated tree byte-matches submitted/, non-zero

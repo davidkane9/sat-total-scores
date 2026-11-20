@@ -26,7 +26,7 @@ SEED      <- 20260514
 M         <- 50   # number of imputations
 dir.create(MI_DIR, showWarnings = FALSE, recursive = TRUE)
 
-YEARS      <- 2018:2025
+YEARS      <- 2018:2026
 MAIN_RACES <- c("White", "Hispanic/Latino", "Black/African American",
                 "Asian", "Two or More Races",
                 "American Indian/Alaska Native",
@@ -282,12 +282,12 @@ cat(sprintf("\nSaved %d per-imputation files + meta.rds in %s\n", M, MI_DIR))
 
 # Headline
 combined <- do.call(rbind, lapply(imputations, function(x) x$draws))
-y25 <- match(2025, YEARS); ai <- match("Asian", RACES); bi <- match("Black/African American", RACES)
+y25 <- match(max(YEARS), YEARS); ai <- match("Asian", RACES); bi <- match("Black/African American", RACES)
 counts <- sapply(seq_along(RACES), function(r)
   N_arr[r, y25] * combined[, sprintf("p_above_1500[%d,%d]", r, y25)])
 pb <- 100 * counts[, bi] / rowSums(counts)
 rr <- counts[, ai] / counts[, bi]
-cat(sprintf("\n=== Multiple-imputation pooled posterior, 2025 ===\n"))
+cat(sprintf("\n=== Multiple-imputation pooled posterior, %d ===\n", YEARS[y25]))
 cat(sprintf("Black share of 1500+: %.2f%% (95%% CI %.2f%%-%.2f%%)\n",
             median(pb), quantile(pb, .025), quantile(pb, .975)))
 cat(sprintf("Asian/Black ratio 1500+: %.1f (95%% CI %.1f-%.1f)\n",

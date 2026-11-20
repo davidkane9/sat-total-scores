@@ -10,10 +10,24 @@ step builds on:
     replicated/data/race/raw/cohort_bands.csv long, cohort-level band counts
     replicated/data/moments/cohort.csv        long, per-year cohort moments
 
-Covers graduating classes 2018-2025: the new SAT (400-1600 scale) with
+Covers graduating classes 2018-2026: the new SAT (400-1600 scale) with
 the full per-race × score-band breakdown for the Total score (six
 bands: 1400-1600, 1200-1390, ..., 400-590) on the "Score Distributions
 by Subgroup" page.
+
+Two report layouts are handled:
+
+  * 2018-2025 — every number is printed as text in tables.
+
+  * 2026       — redesigned report.  The per-race band breakdown is a
+    stacked bar chart with only some segments labelled, so the band
+    percentages are read from the widths of the bar rectangles (which
+    are drawn at integer percents).  Race labels are shortened
+    ("African American", "Two or More"), the ERW section is renamed
+    RW, the cohort SD is no longer printed (so `sd` is blank for 2026
+    in `moments/cohort.csv`), and the quartiles appear as a line of
+    three scores above "25th percentile 50th percentile 75th
+    percentile".
 
 Output schemas
 ==============
@@ -220,11 +234,149 @@ def parse_cohort_percentiles(page_text: str) -> dict[int, int]:
     return out
 
 
+# ─────────────────────────────────────────────────────────────────────
+# 2026+ layout: short race labels, bar-chart subgroup distributions
+# ─────────────────────────────────────────────────────────────────────
+SHORT_TO_SUMMARY_RACE = {
+    "American Indian":  "American Indian/Alaska Native",
+    "Asian":            "Asian",
+    "African American": "Black/African American",
+    "Hispanic":         "Hispanic/Latino",
+    "Native Hawaiian":  "Native Hawaiian/Other Pacific Islander",
+    "White":            "White",
+    "Two or More":      "Two or More Races",
+    "No Response":      "No Response",
+}
+
+
+def parse_v3_race_summary(page_text: str) -> dict[str, tuple[int, int]]:
+    """2026+ per-race summary rows, e.g.
+        African American 233,864 12% 917 470 447 20% 46% 22% 52%
+    Returns {race_label: (N, mean_total)} keyed by the full 2018-2025
+    labels so every year's raw file uses the same names."""
+    out: dict[str, tuple[int, int]] = {}
+    for short, label in SHORT_TO_SUMMARY_RACE.items():
+        pat = (rf"^\s*{re.escape(short)}\s+([\d,]+)\s+\d+%\s+(\d+)\s+\d+\s+\d+\s+"
+               r"\d+%\s+\d+%\s+\d+%\s+\d+%")
+        m = re.search(pat, page_text, re.MULTILINE)
+        if m:
+            out[label] = (int(m.group(1).replace(",", "")), int(m.group(2)))
+    return out
+
+
+def parse_v3_band_chart(page, year: int) -> dict[tuple[str, str], int]:
+    """Read the per-race Total-score band percentages from the stacked
+    bar chart on the 2026+ 'Score Distributions by Subgroup' page.
+
+    Each race row is six rectangles (drawn twice each) whose widths are
+    integer percents times a common scale.  A band with 0% has no
+    rectangle, so segments are matched to bands by fill colour, using a
+    row that has all six as the reference.  The scale is the full width
+    of such a row.  Returns {(race_label, band): percent}."""
+    words = page.extract_words()
+    # Row anchors: the first word of each race label in the
+    # Race/Ethnicity chart.
+    first_words = {"American": "American Indian", "Asian": "Asian",
+                   "African": "African American", "Hispanic": "Hispanic",
+                   "Native": "Native Hawaiian", "White": "White",
+                   "Two": "Two or More"}
+    hdr = [w for w in words if w["text"] == "Race/Ethnicity"]
+    if not hdr:
+        return {}
+    y_hdr = hdr[0]["top"]
+    anchors: dict[str, float] = {}
+    for w in words:
+        if w["text"] in first_words and w["x0"] < 100 and w["top"] > y_hdr:
+            anchors.setdefault(first_words[w["text"]], w["top"])
+
+    def row_rects(top):
+        """Rectangles on one race's row, deduplicated, left to right."""
+        seen, out = set(), []
+        for r in page.rects:
+            if abs(r["top"] - top) < 8 and r["x0"] > 120 and r["width"] > 0.5:
+                key = (round(r["x0"], 1), round(r["width"], 1))
+                if key not in seen:
+                    seen.add(key)
+                    out.append(r)
+        return sorted(out, key=lambda r: r["x0"])
+
+    rects = {short: row_rects(top) for short, top in anchors.items()}
+    full = [rs for rs in rects.values() if len(rs) == 6]
+    if not full:
+        return {}
+    colours = [str(r.get("non_stroking_color")) for r in full[0]]
+    scale = (full[0][-1]["x1"] - full[0][0]["x0"]) / 100.0
+    out: dict[tuple[str, str], int] = {}
+    for short, rs in rects.items():
+        pct = [0] * 6
+        for r in rs:
+            c = str(r.get("non_stroking_color"))
+            if c not in colours:
+                raise ValueError(f"{year} {short}: unmatched segment colour {c}")
+            pct[colours.index(c)] = round(r["width"] / scale)
+        if not 98 <= sum(pct) <= 102:
+            raise ValueError(f"{year} {short}: band percents sum to {sum(pct)}")
+        for b, band in enumerate(BAND_ORDER):
+            out[(SHORT_TO_SUMMARY_RACE[short], band)] = pct[b]
+    return out
+
+
+def parse_v3_percentiles(page_text: str) -> dict[int, int]:
+    """2026+: the three Total-score quartiles are printed above their
+    labels, so the extracted text has a line '870 1030 1220' followed by
+    '25th percentile 50th percentile 75th percentile'."""
+    lines = page_text.splitlines()
+    for i, line in enumerate(lines[1:], start=1):
+        if re.search(r"25th percentile\s+50th percentile\s+75th percentile", line):
+            m = re.match(r"\s*(\d{3,4})\s+(\d{3,4})\s+(\d{3,4})\s*$", lines[i - 1])
+            if m:
+                return {25: int(m.group(1)), 50: int(m.group(2)), 75: int(m.group(3))}
+    return {}
+
+
+def extract_year_v3(pdf, page_texts: list[str], year: int):
+    """2026+ report layout.  Same return shape as extract_year; the
+    cohort SD is always None because the report no longer prints it."""
+    race_summary: dict[str, tuple[int, int]] = {}
+    cohort_summary: tuple[int, int] | None = None
+    band_pcts: dict[tuple[str, str], int]   = {}
+    cohort_bands: dict[str, int]            = {}
+    cohort_pct: dict[int, int]              = {}
+
+    for txt in page_texts:
+        if re.search(r"^\s*African American\s+[\d,]+\s+\d+%", txt, re.MULTILINE):
+            race_summary   = parse_v3_race_summary(txt)
+            cohort_summary = parse_cohort_summary(txt)
+            break
+    # The cohort Total row sits on the participation page, before the
+    # per-race page.  Take the first page that has it (the SAT pages
+    # precede the PSAT pages).
+    if cohort_summary is None:
+        for txt in page_texts:
+            cohort_summary = parse_cohort_summary(txt)
+            if cohort_summary is not None:
+                break
+    for page, txt in zip(pdf.pages, page_texts):
+        if "Score Distributions by Subgroup" in txt and "Race/Ethnicity" in txt:
+            band_pcts = parse_v3_band_chart(page, year)
+            break
+    for txt in page_texts:
+        if "Total Scores" in txt and re.search(r"1400[–-]1600\s+[\d,]+", txt):
+            cohort_bands = parse_cohort_band_counts(txt)
+            cohort_pct   = parse_v3_percentiles(txt)
+            break
+
+    return race_summary, cohort_summary, band_pcts, cohort_bands, None, cohort_pct
+
+
 def extract_year(pdf_path: Path):
-    """Return (race_summary, band_pcts, cohort_bands, cohort_sd,
-    cohort_pct) for one PDF.  See call site for the schemas."""
+    """Return (race_summary, cohort_summary, band_pcts, cohort_bands,
+    cohort_sd, cohort_pct) for one PDF.  See call site for the schemas."""
+    year = int(pdf_path.stem)
     with pdfplumber.open(pdf_path) as pdf:
         page_texts = [p.extract_text() or "" for p in pdf.pages]
+        if year >= 2026:
+            return extract_year_v3(pdf, page_texts, year)
 
     race_summary: dict[str, tuple[int, int]] = {}
     cohort_summary: tuple[int, int] | None = None

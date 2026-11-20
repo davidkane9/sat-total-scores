@@ -148,10 +148,12 @@ git push origin v<N>
   `submitted/data/` are now stale: run `bin/everything data` first,
   hand-sync `replicated/data/` → `submitted/data/`, then start this
   procedure.
-- If the user has changed `code/run_fit_mi.R`, `code/shash_dirichlet_bands.stan`,
-  or anything that affects the Stan fit: run `bin/everything sims`
-  first (~50 min on 8 cores), hand-sync `replicated/sims/mi/` →
-  `submitted/sims/mi/`, then start this procedure.
+- If the user has changed `code/run_fit_mi.R`,
+  `code/run_fit_sensitivity.R`, any `code/*.stan` file, or anything
+  else that affects the Stan fits: run `bin/everything sims` first
+  (about an hour on 8 cores), hand-sync `replicated/sims/` →
+  `submitted/sims/` (both `mi/` and `sensitivity/`), then start this
+  procedure.
 - If `tests/run_all.sh` is reporting failures unrelated to the
   user's change: **stop and investigate**, don't bypass the test
   failure.

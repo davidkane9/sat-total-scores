@@ -1,36 +1,58 @@
-# Replication — *A Model for the Distribution of SAT Total Scores*
+# Replication archive — *A Model for the Distribution of SAT Total Scores*
 
-This repository contains everything needed to reproduce the manuscript:
-the raw College Board source PDFs, the Python extractors that parse
-them into CSVs, the Stan model and its R driver, and the Quarto
-source that renders to DOCX, HTML, and PDF.
+This repository is the replication archive for the paper *A Model for
+the Distribution of SAT Total Scores*, which is forthcoming at
+*Intelligence & Cognitive Abilities* (ICA). It holds everything
+needed to reproduce every number, table, and figure in the accepted
+version of the paper:
+
+- the raw College Board sources (the Total Group annual reports for
+  the graduating classes of 2018 through 2026, and the SAT User
+  Percentile tables);
+- the Python extractors that parse them into CSVs;
+- the Stan models and their R drivers (the canonical model and the
+  three variants in the paper's Sensitivity section);
+- the Quarto source of the manuscript, which renders to DOCX, HTML,
+  and PDF.
+
+The paper fits a Bayesian hierarchical model to the percentage of each
+racial/ethnic group's test-takers in six wide score bands, which is
+all the College Board publishes by group, in order to estimate group
+shares at the top of the score scale. The archive follows the accepted
+version: it uses the nine graduating classes 2018 through 2026, and
+its headline numbers are for the class of 2026.
+
+## What is in `submitted/` and `replicated/`
 
 The single most important directory is **[`submitted/`](submitted/)**.
-It is an immutable mirror of the artifacts that were submitted to ICA:
+It is a frozen copy of the artifacts behind the accepted version of
+the paper:
 
 - `submitted/data/` — extracted CSVs (per-race × score-band counts and
   percentages, user-percentile reference tables, cohort moments).
 - `submitted/sims/mi/` — the canonical Stan posterior, stored as 50
   per-imputation `.rds` files plus a `meta.rds`.
+- `submitted/sims/sensitivity/` — the three sensitivity fits
+  (`skewt.rds`, `widedelta.rds`, `epsyear.rds`) plus a `meta.rds`.
 - `submitted/docs/` — the rendered manuscript:
   `sat_model.{docx, pdf, html}`.
 
 **Nothing in `submitted/` is ever touched by the replication scripts.**
-It is the ground truth that every reproduction is compared against;
-treat it as immutable.
+It is the reference that every reproduction is compared against;
+treat it as immutable. (The directory keeps the name it had when it
+mirrored the original submission to ICA; it now holds the accepted
+version.)
 
 The parallel directory **[`replicated/`](replicated/)** is where the
 replication scripts write their output. On a fresh clone, `replicated/`
 starts as a byte-identical copy of `submitted/`. Running any stage of
 the pipeline overwrites part of `replicated/`; the
-[`bin/compare`](bin/compare) script then diffs the two trees. Byte
-equality means the reproduction succeeded; any diff signals a
-discrepancy worth investigating.
+[`bin/compare`](bin/compare) script then diffs the two trees.
 
 The aim is that anyone — including a user with no prior exposure to
 the code — can open a Codespace straight from GitHub, run a couple of
-commands, and reproduce the figures and numbers in the paper to the
-last digit. No local install, no clone, no `git` setup.
+commands, and reproduce the figures and numbers in the paper. No local
+install, no clone, no `git` setup.
 
 Past that, the same machinery supports **sensitivity analysis** — what
 if the prose changes, or the underlying data is different? Two worked
@@ -41,13 +63,39 @@ examples at the bottom of this README walk through both:
   `compare.html` show the prose change against the original abstract
   with every other table and figure visually identical.
 - *Worked example 2* — change the **Black 1400-1600 percentage in
-  the 2025 input data from 1% to 25%**, run the full pipeline
-  (~1 hour, dominated by the Stan refit), and watch the headline
+  the 2026 input data from 2% to 25%**, run the full pipeline
+  (over an hour, dominated by the Stan refit), and watch the headline
   numbers, validation plots, and figures shift visibly throughout
   the manuscript.
 
-If you just want to verify the paper as-published, follow Quick start
+If you just want to verify the paper as accepted, follow Quick start
 and stop there. If you want to poke at it, jump to the examples first.
+
+## How exact is the reproduction?
+
+- **data** — exact. The extractors are deterministic, so
+  `bin/compare data` should report every CSV byte-identical.
+- **sims, canonical fit** (`sims/mi/`) — exact on the software stack
+  that produced the stored fit, and equal up to Monte Carlo error
+  elsewhere. The fit is fully seeded, but MCMC draws are only
+  bit-for-bit reproducible on the same platform, compiler, and CmdStan
+  version. The draws in `submitted/sims/` are the ones the accepted
+  paper was rendered from; they were fit on the author's machine
+  (macOS, CmdStan 2.38.0), where a refit reproduces all 50
+  imputation files and `meta.rds` byte-for-byte. The Codespace runs
+  Linux and CmdStan 2.39.0, so a refit there should reproduce the
+  paper's numbers to within Monte Carlo error, but `bin/compare sims`
+  may report the `.rds` files as DIFFER.
+- **sims, sensitivity fits** (`sims/sensitivity/`) — equal up to
+  Monte Carlo error only, on any machine. The sampler is seeded, but
+  the initial values are drawn in forked worker processes whose
+  random-number state is not, so each run starts its chains somewhere
+  different. `bin/compare sims` will always report the three variant
+  files as DIFFER after a refit; the Black share of the 1500+ pool
+  they imply moves by a few hundredths of a percentage point.
+- **docs** — compared visually, not byte-for-byte (see below).
+  Rendered on the author's machine from the stored draws, the HTML
+  manuscript is byte-identical to the accepted one.
 
 ## Quick start
 
@@ -68,13 +116,13 @@ and stop there. If you want to poke at it, jump to the examples first.
 
    ```bash
    bin/check_env          # verifies every pinned dep is installed
-   bin/everything docs    # ~5 min: re-render the manuscript and diff vs submitted/
+   bin/everything docs    # ~5 min: re-render the manuscript and compare vs submitted/
    ```
 
 ## The pipeline
 
 ```
-downloads/ ─[code/*.py]─► data/ ─[code/run_fit_mi.R]─► sims/ ─[documents/sat_model.qmd]─► docs/
+downloads/ ─[code/*.py]─► data/ ─[code/run_fit_*.R]─► sims/ ─[documents/sat_model.qmd]─► docs/
 ```
 
 Each arrow corresponds to one *scope*. Five scripts in `bin/` each
@@ -95,14 +143,24 @@ wall time:
 | Scope | Inputs | Produces | Wall time |
 |---|---|---|---|
 | `data` | `downloads/sat/**` (raw PDFs and HTML) | `replicated/data/{race/raw,race/augmented,moments,percentiles}/*.csv` | ~2 min |
-| `sims` | `replicated/data/race/augmented/*.csv` | `replicated/sims/mi/imp_NN.rds` (50 files) + `meta.rds` | ~50 min |
+| `sims` | `replicated/data/race/augmented/*.csv` | `replicated/sims/mi/imp_NN.rds` (50 files) + `meta.rds`, then `replicated/sims/sensitivity/{skewt, widedelta, epsyear, meta}.rds` | ~1 hour |
 | `docs` | `replicated/data/...` + `replicated/sims/mi/...` | `replicated/docs/sat_model.{docx, html, pdf}` | ~5 min |
-| `all` | (chains the three above in order) | (all three) | ~1 hour |
+| `all` | (chains the three above in order) | (all three) | ~70 min |
 
 Nothing reads from `submitted/`. If `bin/generate sims` (or
 `bin/generate docs`) can't find its inputs in `replicated/`, it exits
 with a clear error pointing at `bin/restore` (instant restore) or
 `bin/generate` for the missing stage.
+
+The `sims` scope runs two drivers in order.
+[`code/run_fit_mi.R`](code/run_fit_mi.R) fits the canonical model to
+50 imputed datasets (the published band percentages are integers, so
+each imputation draws the underlying percentages from their rounding
+intervals). [`code/run_fit_sensitivity.R`](code/run_fit_sensitivity.R)
+then fits the three variants reported in the paper's Sensitivity
+section — a two-piece skew-t in place of the sinh-arcsinh, a five-fold
+wider tail-weight prior, and year-varying skewness — each once, on
+imputation 1.
 
 ### `bin/compare docs` — a *visual* diff, not a byte diff
 
@@ -118,7 +176,9 @@ So `bin/compare docs` generates a side-by-side HTML page instead. It
 reads `submitted/docs/sat_model.html` and
 `replicated/docs/sat_model.html`, pulls out the abstract section plus
 every `<div id="tbl-…">` and `<div id="fig-…">` from each, and writes
-a single self-contained page at `replicated/docs/compare.html`:
+a single self-contained page at `replicated/docs/compare.html`. (The
+four Appendix tables carry no such label, so they are not on that
+page; compare them in the rendered manuscripts themselves.)
 
 ```
 Abstract                      ← from submitted/
@@ -165,14 +225,14 @@ guardrail.
 bin/everything data
 ```
 
-**Re-fit the Stan model** (the long step — ~50 min on an 8-core
-codespace):
+**Re-fit the Stan models** (the long step — about an hour on an
+8-core codespace):
 
 ```bash
 bin/everything sims
 ```
 
-**Reproduce the entire pipeline from raw inputs** (~1 hour, dominated
+**Reproduce the entire pipeline from raw inputs** (~70 min, dominated
 by Stan):
 
 ```bash
@@ -189,14 +249,16 @@ Build timestamps inside the DOCX and PDF are pinned via the
 `SOURCE_DATE_EPOCH` environment variable (see
 [`.devcontainer/devcontainer.json`](.devcontainer/devcontainer.json))
 so re-rendering on a different day still produces byte-identical
-files. The Stan fit is fully seeded, so re-fitting on the same
-software stack produces byte-identical `.rds` files. PDF rendering
+files. The Stan fits are fully seeded, so re-fitting on the same
+software stack produces byte-identical `.rds` files (see *How exact
+is the reproduction?* above for what "same software stack" means
+here). PDF rendering
 uses Quarto's bundled Typst engine — no separate LaTeX install needed.
 
 ## Long runs: idle timeout, resume, and check_status
 
-A full `bin/everything sims` takes ~50 minutes on an 8-core codespace,
-and `bin/everything all` takes ~1 hour. Both runs are longer than
+A full `bin/everything sims` takes about an hour on an 8-core
+codespace, and `bin/everything all` a little longer. Both runs are longer than
 Codespaces' default **idle timeout of 30 minutes**, so without
 mitigation a long run *will* be killed before it finishes if you walk
 away.
@@ -205,7 +267,7 @@ away.
 
 Codespaces' idle timer is reset only by keystrokes in the browser tab
 and by terminal input — not by a running script. So
-`bin/everything sims` chugging away for 50 minutes in your terminal,
+`bin/everything sims` chugging away for an hour in your terminal,
 with you reading email in another tab, looks 100% idle to GitHub. At
 the 30-minute mark the container is stopped and your script dies
 mid-imputation. (You'll come back to a "codespace is stopped" page
@@ -249,7 +311,8 @@ is lost — files persist across shutdowns. To resume:
 3. **Resume.** The Stan fit is **resumable at the imputation level**:
    `code/run_fit_mi.R` skips any `imp_NN.rds` that already exists
    from a prior run and reuses it. So a sims run that got 30 of 50
-   imputations done picks up at imputation 31:
+   imputations done picks up at imputation 31, and then runs the
+   three sensitivity fits (~15 to 25 min, not resumable individually):
    ```bash
    bin/generate sims      # NOT bin/everything sims — that wipes progress
                           # NOT bin/clean sims either — same reason
@@ -272,10 +335,10 @@ bin/generate sims
 
 | Path | Contents |
 |---|---|
-| [`downloads/`](downloads/) | Raw, unmodified College Board source PDFs and HTML (graduating classes 2018+). Read-only inputs to the parsers. |
-| [`code/`](code/) | Pipeline source: two Python extractors (`extract_sat.py`, `extract_user_percentiles.py`) plus a derivation step (`augment_race.py`) that back-computes the No Response band percentages from the PDF-sourced numbers; one R driver (`run_fit_mi.R`) and one Stan model (`shash_dirichlet_bands.stan`). |
+| [`downloads/`](downloads/) | Raw, unmodified College Board source PDFs and HTML (graduating classes 2018 through 2026). Read-only inputs to the parsers. |
+| [`code/`](code/) | Pipeline source: two Python extractors (`extract_sat.py`, `extract_user_percentiles.py`) plus a derivation step (`augment_race.py`) that back-computes the No Response band percentages from the PDF-sourced numbers; the canonical Stan model (`shash_dirichlet_bands.stan`) and its R driver (`run_fit_mi.R`); and the three sensitivity variants (`skewt_dirichlet_bands.stan`, `shash_dirichlet_bands_widedelta.stan`, `shash_dirichlet_bands_epsyear.stan`) and their driver (`run_fit_sensitivity.R`). |
 | [`documents/`](documents/) | Paper-rendering source: `sat_model.qmd`, the two R helpers it sources (`_inputs.R`, `_headlines.R`), and Quarto fixtures (`references.bib`, `apa.csl`, `ica-manuscript.docx`). |
-| [`submitted/`](submitted/) | Frozen canonical artifacts: `data/`, `sims/mi/`, `docs/`. Immutable. |
+| [`submitted/`](submitted/) | Frozen artifacts behind the accepted paper: `data/`, `sims/mi/`, `sims/sensitivity/`, `docs/`. Immutable. |
 | [`replicated/`](replicated/) | User outputs: same shape as `submitted/`. Initially byte-identical; written to by `bin/generate` and `bin/restore`. |
 | [`bin/`](bin/) | The five user-facing scripts (`clean`, `generate`, `compare`, `restore`, `everything`) plus [`bin/check_env`](bin/check_env) (verifies every pinned dep is installed) and [`bin/check_status`](bin/check_status) (reports where the pipeline left off and what to run next). |
 | [`.devcontainer/`](.devcontainer/) | Codespace setup. Pins every R package, Python package, Stan version, and toolchain version. |
@@ -293,10 +356,9 @@ container it runs `bin/check_env`, then `bin/everything data`, then
 `bin/everything docs`. Any regression — a missing apt dep, a parser
 path edit that broke, a `.qmd` change that won't render — fails the PR
 before it reaches a user's codespace. (`bin/everything sims` is
-skipped in CI: it's a ~50-minute Stan refit even on the 8-core
-codespace spec the CI runner matches — too long for per-PR CI given
-GitHub Actions' time budget. Users can run it themselves if they
-want full coverage.)
+skipped in CI: it's a Stan refit of about an hour even on an 8-core
+codespace — too long for per-PR CI. Users can run it themselves if
+they want full coverage.)
 
 ## Worked examples: what changes when you change things
 
@@ -313,14 +375,14 @@ You decide to flag the abstract as a work-in-progress by inserting a
 short marker. Open [`documents/sat_model.qmd`](documents/sat_model.qmd),
 find the line in the abstract that begins:
 
-> The College Board's SAT is the most widely used standardized test for
-> university and college admissions in the United States, ...
+> The SAT, the college admissions test administered by the College
+> Board, is taken by about two million students ...
 
-Append a phrase — anything you'll recognize, e.g.:
+Insert a phrase — anything you'll recognize, e.g.:
 
-> The College Board's SAT (**reviewer copy — draft, do not circulate**)
-> is the most widely used standardized test for university and college
-> admissions in the United States, ...
+> The SAT (**reviewer copy — draft, do not circulate**), the college
+> admissions test administered by the College Board, is taken by about
+> two million students ...
 
 Save. Then:
 
@@ -336,8 +398,8 @@ What you should see in `compare.html`:
 - **Abstract** — two side-by-side panels. The `submitted` panel has
   the original prose; the `replicated` panel has the same prose plus
   your "reviewer copy — draft, do not circulate" marker. The
-  surrounding headline numbers (e.g. *"approximately X% of
-  SAT-takers scoring 1500 or higher are Black"*) are identical
+  surrounding headline numbers (e.g. *"Black test-takers make up
+  1.3% ... of those scoring 1500 or higher"*) are identical
   between the two panels — they come from a Stan posterior that
   wasn't refit, so the numbers don't move.
 - **Every Table tbl-… and Figure fig-…** — visually identical.
@@ -359,44 +421,44 @@ Two takeaways:
 To revert: `git restore documents/sat_model.qmd`, then either
 `bin/restore docs` (instant) or rerun `bin/generate docs` (~5 min).
 
-### Example 2 — data edit: Black 1400-1600 from 1% → 25%
+### Example 2 — data edit: Black 1400-1600 from 2% → 25%
 
-This is the counterfactual we walked through earlier in the session,
-made concrete and end-to-end. We're going to hand-edit the 2025 input
-data so that 25 percent of Black/African American test-takers scored
-1400 or above (vs. the College Board's published 1 percent), with a
-countervailing decrease in the modal band so the row still sums to
-100. Then we'll refit, re-render, and look at how much of the
-manuscript moves.
+This is a counterfactual, made concrete and end-to-end. We're going
+to hand-edit the 2026 input data so that 25 percent of Black/African
+American test-takers scored 1400 or above (vs. the College Board's
+published 2 percent), with a countervailing decrease in the modal
+band so the row total is unchanged. Then we'll refit, re-render, and
+look at how much of the manuscript moves.
 
-Open [`replicated/data/race/raw/2025.csv`](replicated/data/race/raw/2025.csv).
+Open [`replicated/data/race/raw/2026.csv`](replicated/data/race/raw/2026.csv).
 The Black row reads:
 
 ```
-Black/African American,250887,904,5,26,40,21,7,1
+Black/African American,233864,917,4,24,39,22,8,2
 ```
 
 Columns are `race, N, mean, b_400_590, b_600_790, b_800_990, b_1000_1190, b_1200_1390, b_1400_1600`.
 Edit the row to:
 
 ```
-Black/African American,250887,904,5,26,16,21,7,25
+Black/African American,233864,917,4,24,16,22,8,25
 ```
 
-Two changes: the top band (`b_1400_1600`) goes from 1 to 25, and the
-modal band (`b_800_990`) drops from 40 to 16 to keep the row summing
-to 100. Save.
+Two changes: the top band (`b_1400_1600`) goes from 2 to 25, and the
+modal band (`b_800_990`) drops from 39 to 16 to keep the row total
+where it was (the published integer percentages sum to 99). Save.
 
 Then:
 
 ```bash
 python3 code/augment_race.py   # rebuild race/augmented/ with the new NR derivation
-                               # (the No Response 1400-1600 row will get clipped
-                               # to 0.0%, because the named-race contributions
-                               # now exceed the published cohort total)
+                               # (the No Response 1400-1600 percentage is
+                               # derived by subtraction from the published
+                               # cohort total, so it falls sharply and is
+                               # clipped at 0.0% if it would go negative)
 
-bin/clean    sims              # wipe the canonical fit
-bin/generate sims              # ~50 min on 8 cores: refit on the edited data
+bin/clean    sims              # wipe the canonical and sensitivity fits
+bin/generate sims              # ~1 hour on 8 cores: refit on the edited data
 bin/clean    docs
 bin/generate docs              # ~5 min: re-render against the new posterior
 bin/compare  docs              # generates replicated/docs/compare.html
@@ -407,20 +469,19 @@ What you should see in `compare.html`:
 
 - **Abstract** — the headline figure is roughly an order of magnitude
   higher in the `replicated` panel. The original abstract says
-  *"approximately ~1% of SAT-takers scoring 1500 or higher are Black,"*
-  (or thereabouts); the replicated abstract will say something more
-  like 25%, because the model is now fitting a much heavier
-  Black upper tail. The 95% credible interval moves with it.
+  that Black test-takers make up 1.3% of those scoring 1500 or
+  higher; the replicated abstract will report a far larger share,
+  because the model is now fitting a much heavier Black upper tail. The 95% credible interval moves with it.
 - **Most figures move.** The data-trends plot (`fig-data-trends`)
   will show a visibly bigger Black share in the 1400-1600 band for
-  2025. The cohort-quartile-rank plot (`fig-cohort-quartile-ranks`)
+  2026. The cohort-quartile-rank plot (`fig-cohort-quartile-ranks`)
   will degrade because the held-out cohort moments don't agree with
   the new fitted distribution. The validation figures
   (`fig-validate`, `fig-ppc-resid`) will show poorer fit — that's
   the model honestly reporting that the edited band table contradicts
   the published cohort moments and user-percentile tables.
 - **Tables also move.** `tbl-pdf` shows the edited input directly
-  (25 vs. 1 in the Black, 1400-1600 cell, and 16 vs. 40 in the
+  (25 vs. 2 in the Black, 1400-1600 cell, and 16 vs. 39 in the
   Black, 800-990 cell). `tbl-params` shifts on every Black-specific
   posterior summary.
 
@@ -428,7 +489,7 @@ Three takeaways:
 
 - *A data edit forces a full refit.* The Stan posterior depends on
   the band percentages; change them and every downstream number has
-  to be recomputed. This is the ~1-hour path.
+  to be recomputed. This is the long path, over an hour.
 - *The compare tool is faithful even when the change is large.*
   `compare.html` doesn't care whether you moved one digit or
   rewrote the underlying probability — it shows you the abstract,

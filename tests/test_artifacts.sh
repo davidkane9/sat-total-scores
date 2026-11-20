@@ -5,7 +5,8 @@
 # PASS: / FAIL: lines.  Exits non-zero on any failure.
 #
 # Covers:
-#   counts          24 data CSVs, 50 imp_*.rds + meta.rds, 3 sat_model.*
+#   counts          26 data CSVs, 50 imp_*.rds + meta.rds, 4 sensitivity
+#                   .rds, 3 sat_model.*
 #   HEAD-blob sync  every tracked file under submitted/ has the same
 #                   blob hash as its counterpart under replicated/
 #                   (git's content-addressable storage means equal hash
@@ -18,7 +19,7 @@ failures=0
 pass() { printf '  PASS  %s\n' "$1"; }
 fail() { printf '  FAIL  %s — %s\n' "$1" "$2"; failures=$((failures + 1)); }
 
-EXPECT_DATA_CSVS=24
+EXPECT_DATA_CSVS=26
 EXPECT_SIM_IMPS=50
 EXPECT_DOCS=3
 
@@ -44,6 +45,15 @@ for tree in submitted replicated; do
         pass "$tree/sims/mi/meta.rds present"
     else
         fail "$tree/sims/mi/meta.rds" "missing"
+    fi
+
+    n=$(ls "$tree"/sims/sensitivity/skewt.rds "$tree"/sims/sensitivity/widedelta.rds \
+            "$tree"/sims/sensitivity/epsyear.rds "$tree"/sims/sensitivity/meta.rds \
+            2>/dev/null | wc -l | tr -d ' ')
+    if [[ "$n" -eq 4 ]]; then
+        pass "$tree/sims/sensitivity: 4 .rds (skewt, widedelta, epsyear, meta)"
+    else
+        fail "$tree/sims/sensitivity" "expected 4 .rds, got $n"
     fi
 
     n=$(ls "$tree"/docs/sat_model.docx "$tree"/docs/sat_model.html \

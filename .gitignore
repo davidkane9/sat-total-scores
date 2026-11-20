@@ -16,6 +16,15 @@ __pycache__/
 code/shash_dirichlet_bands
 code/shash_dirichlet_bands.hpp
 code/shash_dirichlet_bands.d
+code/shash_dirichlet_bands_widedelta
+code/shash_dirichlet_bands_widedelta.hpp
+code/shash_dirichlet_bands_widedelta.d
+code/shash_dirichlet_bands_epsyear
+code/shash_dirichlet_bands_epsyear.hpp
+code/shash_dirichlet_bands_epsyear.d
+code/skewt_dirichlet_bands
+code/skewt_dirichlet_bands.hpp
+code/skewt_dirichlet_bands.d
 
 # Ephemeral comparison artifact produced by `bin/compare docs`;
 # regenerated whenever the script runs.

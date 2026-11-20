@@ -12,9 +12,9 @@
 #                            documents/sat_model.qmd, diff against
 #                            submitted/docs/
 #
-# bin/everything sims is deliberately skipped: it's a ~3-hour Stan
-# refit and would blow the default 6-hour GitHub Actions budget every
-# time. Users run it themselves when they want full coverage.
+# bin/everything sims is deliberately skipped: it's a ~1-hour Stan
+# refit, longer than this job's 45-minute timeout. Users run it
+# themselves when they want full coverage.
 #
 # Uses the official devcontainers/ci action — the same engine
 # Codespaces runs (the @devcontainers/cli node package). A full build
